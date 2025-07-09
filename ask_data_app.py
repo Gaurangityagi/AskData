@@ -16,7 +16,7 @@ import json
 import ast
 
 st.set_page_config(page_title="📊 E-Commerce Assistant", layout="wide")
-st.title("📊 AskData-Data Answers made easy")
+st.title("📊 AskData-Data answers made easy")
 
 @st.cache_resource
 def initialize_llm():
