@@ -14,13 +14,8 @@ import numpy as np
 import json
 import ast
 
-st.set_page_config(page_title="📊 E-Commerce Assistant", layout="wide")
-st.title("📊 AskData-Data answers made easy")
-
-
-# ---------------------------
-# Initialize LLM
-# ---------------------------
+st.set_page_config(page_title="Ask Data", layout="wide")
+st.title(" AskData-Data answers made easy")
 @st.cache_resource
 def initialize_llm():
     try:
@@ -259,18 +254,18 @@ def main():
         st.header("Configuration")
 
         if llm is not None:
-            st.success("✅ LLM Connected")
+            st.success("Connected")
         else:
-            st.warning("⚠️ LLM Not Available")
+            st.warning("Not Available")
 
         st.subheader("Query Examples")
         st.write("• Product with highest frequency in each region")
-        st.write("• Top 5 customers by total spending")
-        st.write("• Monthly sales trend by category")
+        st.write("• Top 5 students in Maths")
+        st.write("• Plot products by category")
         st.write("• Average order value by gender")
         st.write("• Most popular product category by zone")
 
-    uploaded_file = st.file_uploader("📁 Upload your sales data (CSV)", type=["csv"])
+    uploaded_file = st.file_uploader(" Upload your sales data (CSV)", type=["csv"])
 
     if uploaded_file:
         try:
@@ -285,13 +280,13 @@ def main():
                     continue
 
             if df_raw is None or df_raw.empty:
-                st.error("❌ Failed to load file.")
+                st.error(" Failed to load file.")
                 return
 
             df = preprocess_dataframe(df_raw)
 
             if df.empty:
-                st.error("❌ No valid data after preprocessing.")
+                st.error(" No valid data after preprocessing.")
                 return
 
             st.subheader(" Data Preview")
@@ -317,7 +312,7 @@ def main():
                     else:
                         st.write("No missing values.")
 
-            st.subheader("💬 Ask Your Question")
+            st.subheader(" Ask Your Question")
             query = st.text_input("Enter your query", placeholder="e.g. Top 5 customers by revenue")
 
             col1, col2, col3 = st.columns(3)
@@ -330,7 +325,7 @@ def main():
             # ------------------------------------
             if query and use_ai and llm is not None:
 
-                st.subheader("🔍 Results")
+                st.subheader(" Results")
 
                 if mode == "Smart Analysis":
                     with st.spinner("Analyzing your query..."):
@@ -416,7 +411,7 @@ def main():
                             if "fig" in local_vars:
                                 st.plotly_chart(local_vars['fig'], use_container_width=True)
                             else:
-                                st.warning("⚠️ No figure named 'fig' was created.")
+                                st.warning(" No figure named 'fig' was created.")
 
                         except Exception as e:
                             st.error(f"Chart generation failed: {e}")
@@ -445,3 +440,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
