@@ -184,7 +184,7 @@ def execute_complex_query(df, query, llm):
             HumanMessage(content=f"Generate Python code for: {query}")
         ]
         
-        response = llm(messages)
+        response = llm.invoke(messages)
         code = response.content.strip()
         
         # Clean the code (robustly remove markdown fences if the LLM adds them)
@@ -406,7 +406,7 @@ def main():
                         ]
                         
                         try:
-                            response = llm(messages)
+                            response = llm.invoke(messages)
                             chart_code = response.content
                             chart_code = re.sub(r'^\s*```(python)?\s*\n', '', chart_code, flags=re.MULTILINE)
                             chart_code = re.sub(r'\n\s*```\s*$', '', chart_code, flags=re.MULTILINE)
@@ -431,13 +431,13 @@ def main():
                 elif mode == "Simple Query":
                     try:
                         if not df.empty:
-                            agent = create_pandas_dataframe_agent(
-                                llm=llm,
-                                df=df,
+                           agent = create_pandas_dataframe_agent(
+                                llm,
+                                df,
                                 verbose=True,
-                                allow_dangerous_code=True,
-                                agent_type=AgentType.OPENAI_FUNCTIONS
+                                allow_dangerous_code=True
                             )
+
                             with st.spinner("Processing simple query..."):
                                 result = agent.invoke(query)
                                 st.markdown(result['output'])
@@ -455,6 +455,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
