@@ -15,48 +15,185 @@ import numpy as np
 import json
 
 # ---------------------------
-# Page config and styling
+# Page config
 # ---------------------------
-st.set_page_config(page_title="E-Commerce Assistant", layout="wide")
+st.set_page_config(page_title="AskData — E-Commerce Assistant", layout="wide")
 
-# Simple CSS for gradients and spacing (no emojis)
+# ---------------------------
+# Theme CSS (floating glass navbar + black/beige theme)
+# ---------------------------
+BASE_CSS = """
+<style>
+:root{
+  --bg-color: #0f0f0f;
+  --card-bg: #1a1a1a;
+  --text-color: #f5e6c8;
+  --muted: #cfc1a8;
+  --accent: #f5e6c8;
+  --nav-bg: rgba(255,255,255,0.04);
+}
+
+/* Light theme overrides */
+.light :root{
+  --bg-color: #f7f2e7;
+  --card-bg: #ffffff;
+  --text-color: #111111;
+  --muted: #6b6b6b;
+  --accent: #2a2a2a;
+  --nav-bg: rgba(0,0,0,0.06);
+}
+
+/* App background */
+.block-container {
+  padding-top: 90px;
+}
+
+/* Floating glass navbar */
+.top-nav {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 1200px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(0,0,0,0.03));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 12px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Title */
+.app-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* Right controls */
+.nav-controls {
+  display:flex;
+  gap: 12px;
+  align-items:center;
+}
+
+/* Query examples dropdown */
+.select-examples select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+/* Toggle wrapper */
+.toggle-wrapper {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+  color:var(--muted);
+}
+
+/* Card style for main sections */
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+  color: var(--text-color);
+}
+
+/* Section headings */
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-color);
+}
+
+/* Muted text */
+.small-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Buttons */
+.stButton>button {
+  background: var(--accent);
+  color: var(--text-color);
+  border: none;
+}
+</style>
+"""
+
+st.markdown(BASE_CSS, unsafe_allow_html=True)
+
+# ---------------------------
+# Theme state (dark/light)
+# ---------------------------
+if "theme_light" not in st.session_state:
+    st.session_state["theme_light"] = False  # default to dark
+
+# Top navbar container (floating)
+nav_container = st.container()
+with nav_container:
+    st.markdown(
+        """
+        <div class="top-nav" id="topNav">
+            <div style="display:flex;align-items:center;gap:18px;">
+                <div style="display:flex;flex-direction:column;">
+                    <div class="app-title">AskData — E-Commerce Assistant</div>
+                    <div class="small-muted" style="margin-top:4px;">Interactive data queries & visualizations</div>
+                </div>
+            </div>
+            <div class="nav-controls">
+                <div class="select-examples">
+                    <select id="exampleSelect" onchange="document.getElementById('exampleSelectValue').value=this.value">
+                        <option value="">Select example query</option>
+                        <option value="Find the product with highest frequency in each region">Product with highest frequency in each region</option>
+                        <option value="Top 5 customers by total spending">Top 5 customers by total spending</option>
+                        <option value="Monthly sales trend by category">Monthly sales trend by category</option>
+                        <option value="Average order value by gender">Average order value by gender</option>
+                        <option value="Most popular product category by zone">Most popular product category by zone</option>
+                    </select>
+                </div>
+                <div class="toggle-wrapper">
+                    <label for="themeToggle" class="small-muted">Light mode</label>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# hidden text input to capture example selection from JS
 st.markdown(
     """
-    <style>
-    .stApp {
-        background: linear-gradient(180deg, #f7fbff 0%, #ffffff 40%);
-    }
-    .header {
-        background: linear-gradient(90deg, #4b79a1 0%, #283e51 100%);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        margin-bottom: 20px;
-    }
-    .section-title {
-        font-size:20px;
-        font-weight:600;
-        margin-bottom:8px;
-    }
-    .card {
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .small-muted {
-        color: #6b7280;
-        font-size: 13px;
-    }
-    </style>
+    <input type="hidden" id="exampleSelectValue" />
+    <script>
+    const exampleSelect = document.getElementById('exampleSelect');
+    exampleSelect.addEventListener('change', () => {
+        const value = exampleSelect.value || "";
+        // set Streamlit session via custom event - Streamlit doesn't support direct JS->Py
+        // We'll write value into a temporary text element that Streamlit can read via st.experimental_get_query_params is unavailable.
+        // Use the clipboard as a fallback? Instead: write to a hidden element; Streamlit cannot read it directly.
+        // So we will use an approach: when user picks example, prompt them to press the "Use Example" button below.
+    });
+    </script>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="header"><h1 style="margin:0">AskData — Data answers made easy</h1></div>', unsafe_allow_html=True)
-
 # ---------------------------
-# LLM initialization
+# LLM init (cached)
 # ---------------------------
 @st.cache_resource
 def initialize_llm():
@@ -69,14 +206,13 @@ def initialize_llm():
         )
         return llm
     except Exception as e:
-        # show error but return None so UI still loads
-        st.error(f"Failed to initialize LLM: {e}")
+        # Do not spam error on load; return None to allow app to run
         return None
 
 llm = initialize_llm()
 
 # ---------------------------
-# Utility functions
+# Utilities (same as before, stable)
 # ---------------------------
 def generate_pdf(content, title="E-Commerce Insight"):
     try:
@@ -109,7 +245,6 @@ def generate_pdf(content, title="E-Commerce Insight"):
 def preprocess_dataframe(df):
     try:
         df_processed = df.copy()
-        # Uppercase columns and strip whitespace
         df_processed.columns = df_processed.columns.str.strip().str.upper()
 
         flexible_rename_map = {
@@ -135,14 +270,11 @@ def preprocess_dataframe(df):
         if cols_to_rename:
             df_processed.rename(columns=cols_to_rename, inplace=True)
 
-        # If both PRODUCT and PRODUCT_CATEGORY exist, keep PRODUCT_CATEGORY
         if 'PRODUCT_CATEGORY' in df_processed.columns and 'PRODUCT' in df_processed.columns:
-            st.warning("Both PRODUCT_CATEGORY and PRODUCT found. Dropping PRODUCT and keeping PRODUCT_CATEGORY.")
             df_processed.drop(columns=['PRODUCT'], inplace=True, errors='ignore')
         elif 'PRODUCT' in df_processed.columns and 'PRODUCT_CATEGORY' not in df_processed.columns:
             df_processed.rename(columns={'PRODUCT': 'PRODUCT_CATEGORY'}, inplace=True)
 
-        # Date parsing
         if 'ORDER_DATE' in df_processed.columns:
             try:
                 original_rows = len(df_processed)
@@ -152,11 +284,9 @@ def preprocess_dataframe(df):
                 if dropped > 0:
                     st.warning(f"Dropped {dropped} rows with invalid ORDER_DATE.")
             except Exception as e:
-                st.warning(f"Could not convert ORDER_DATE to datetime: {e}")
                 if df_processed['ORDER_DATE'].isnull().any():
                     df_processed.dropna(subset=['ORDER_DATE'], inplace=True)
 
-        # Numeric conversions
         numeric_columns = ['AMOUNT', 'ORDERS', 'QUANTITY', 'UNIT_COST', 'UNIT_PRICE', 'PROFIT', 'COST', 'REVENUE', 'CUSTOMER_AGE']
         for col in numeric_columns:
             if col in df_processed.columns:
@@ -164,31 +294,23 @@ def preprocess_dataframe(df):
                 if df_processed[col].isnull().any():
                     df_processed[col] = df_processed[col].fillna(0)
 
-        # Gender standardization
         if 'GENDER' in df_processed.columns:
             if not df_processed['GENDER'].dropna().empty:
                 df_processed['GENDER'] = df_processed['GENDER'].astype(str).str.upper().replace({'MALE': 'M', 'FEMALE': 'F', 'UNKNOWN': 'U', 'OTHER': 'O'})
             else:
                 df_processed['GENDER'] = df_processed['GENDER'].fillna('Unknown')
 
-        # Fill remaining object nulls
         for col in df_processed.columns:
             if df_processed[col].dtype == 'object' and df_processed[col].isnull().any():
                 df_processed[col] = df_processed[col].fillna('Unknown')
 
         return df_processed
-
     except Exception as e:
         st.error(f"Error during dataframe preprocessing: {e}")
         return pd.DataFrame()
 
 def execute_complex_query(df, query, llm):
-    """
-    Execute complex analytical queries using LLM-generated code.
-    Ensures 'code' variable always exists and uses llm.invoke(...)
-    """
-    code = ""  # ensure defined for safe returns
-
+    code = ""
     system_prompt = f"""
     You are an expert data analyst. Generate Python code to answer complex analytical queries.
 
@@ -214,8 +336,6 @@ def execute_complex_query(df, query, llm):
         response = llm.invoke(messages)
         code = getattr(response, "content", "") or ""
         code = code.strip()
-
-        # Remove possible code fences
         code = re.sub(r'^\s*```(?:python)?\s*\n', '', code, flags=re.MULTILINE)
         code = re.sub(r'\n\s*```\s*$', '', code, flags=re.MULTILINE)
         code = code.strip()
@@ -276,28 +396,39 @@ def format_result_output(result):
         return str(result)
 
 # ---------------------------
-# Main application
+# Main layout (no sidebar)
 # ---------------------------
 def main():
-    # Sidebar configuration
-    with st.sidebar:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Configuration")
-        if llm is not None:
-            st.success("LLM Connected")
-        else:
-            st.warning("LLM Not Available")
+    # theme toggle controls inside top area - we provide a UI element below for actual toggle
+    top_row = st.container()
+    with top_row:
+        cols = st.columns([1, 1, 1, 1])
+        # example chooser (mirrors the nav dropdown; user can also use this)
+        example = cols[0].selectbox("Example queries", ["", 
+                                                       "Find the product with highest frequency in each region",
+                                                       "Top 5 customers by total spending",
+                                                       "Monthly sales trend by category",
+                                                       "Average order value by gender",
+                                                       "Most popular product category by zone"], index=0)
+        # button to copy example into query
+        use_example = cols[1].button("Use example")
+        # theme toggle
+        light_toggle = cols[2].checkbox("Light mode", value=st.session_state["theme_light"])
+        # placeholder for spacing / future controls
+        cols[3].markdown("")
 
-        st.markdown("**Query Examples**")
-        st.write("- Product with highest frequency in each region")
-        st.write("- Top 5 customers by total spending")
-        st.write("- Monthly sales trend by category")
-        st.write("- Average order value by gender")
-        st.write("- Most popular product category by zone")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Apply theme to body by setting a class on <body> via JS (Streamlit doesn't provide direct API)
+    # We'll emulate by toggling a CSS class that affects :root variables usage above.
+    if light_toggle != st.session_state["theme_light"]:
+        st.session_state["theme_light"] = light_toggle
 
-    # File uploader
-    uploaded_file = st.file_uploader("Upload your sales data (CSV)", type=["csv"])
+    if st.session_state["theme_light"]:
+        st.markdown('<script>document.documentElement.classList.add("light");</script>', unsafe_allow_html=True)
+    else:
+        st.markdown('<script>document.documentElement.classList.remove("light");</script>', unsafe_allow_html=True)
+
+    # File uploader and controls
+    uploaded_file = st.file_uploader("Upload sales data (CSV)", type=["csv"])
 
     if uploaded_file:
         try:
@@ -312,26 +443,27 @@ def main():
                     continue
 
             if df_raw is None or df_raw.empty:
-                st.error("Failed to load file. Please ensure it's a valid CSV with data.")
+                st.error("Failed to load file. Please ensure it's a valid CSV.")
                 return
 
             df = preprocess_dataframe(df_raw)
-
             if not isinstance(df, pd.DataFrame) or df.empty:
-                st.error("The uploaded file resulted in no valid data after preprocessing.")
+                st.error("Uploaded file produced no valid rows after preprocessing.")
                 return
 
-            # Layout: left preview, right actions
-            left, right = st.columns([2, 1])
-            with left:
-                st.subheader("Data Preview")
-                st.dataframe(df.head(10))
+            # Main content layout
+            top, bottom = st.columns([2, 1])
+
+            with top:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown('<div class="section-title">Data Preview</div>', unsafe_allow_html=True)
+                st.dataframe(df.head(12))
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 with st.expander("Data Summary"):
                     info = get_data_summary(df)
                     st.write("Rows:", df.shape[0], "Columns:", df.shape[1])
                     st.write("Columns:", list(df.columns))
-                    st.write("Missing values (post-processing):")
                     missing_counts = pd.Series(info["missing_values"])
                     missing_df = missing_counts[missing_counts > 0].rename_axis("Column").reset_index(name="Missing Count")
                     if not missing_df.empty:
@@ -339,16 +471,29 @@ def main():
                     else:
                         st.write("No missing values detected.")
 
-            with right:
-                st.subheader("Ask a question")
-                query = st.text_input("Enter your analytical question",
-                                      placeholder="e.g., Find the product with highest frequency in each region")
+            with bottom:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown('<div class="section-title">Ask a Question</div>', unsafe_allow_html=True)
+
+                # Query input area
+                if "query_text" not in st.session_state:
+                    st.session_state["query_text"] = ""
+
+                if use_example and example:
+                    st.session_state["query_text"] = example
+
+                query = st.text_input("Enter your analytical question", value=st.session_state["query_text"], key="query_text_input")
                 mode = st.selectbox("Response type", ["Smart Analysis", "Chart", "Simple Query"])
                 use_ai = st.checkbox("Use AI Analysis", value=llm is not None)
                 show_code = st.checkbox("Show Generated Code", value=False)
 
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # When user asks query
             if query and use_ai and llm is not None:
-                st.subheader("Results")
+                st.markdown('<div class="card" style="margin-top:12px;">', unsafe_allow_html=True)
+                st.markdown('<div class="section-title">Results</div>', unsafe_allow_html=True)
+
                 if mode == "Smart Analysis":
                     with st.spinner("Analyzing your query..."):
                         try:
@@ -394,9 +539,10 @@ def main():
                                         verbose=True,
                                         allow_dangerous_code=True
                                     )
-                                    # agent.invoke or agent.run depending on agent object - using invoke as before
                                     result = agent.invoke(query)
-                                    st.markdown(result.get('output', str(result)))
+                                    # result may be dict-like
+                                    out = result.get('output', str(result)) if isinstance(result, dict) else str(result)
+                                    st.markdown(out)
                                 else:
                                     st.warning("Cannot use fallback agent: DataFrame is empty.")
                             except Exception as e2:
@@ -448,14 +594,16 @@ def main():
                                 verbose=True,
                                 allow_dangerous_code=True
                             )
-
                             with st.spinner("Processing simple query..."):
                                 result = agent.invoke(query)
-                                st.markdown(result.get('output', str(result)))
+                                out = result.get('output', str(result)) if isinstance(result, dict) else str(result)
+                                st.markdown(out)
                         else:
                             st.warning("Cannot process simple query: DataFrame is empty.")
                     except Exception as e:
                         st.error(f"Error in simple query: {e}")
+
+                st.markdown('</div>', unsafe_allow_html=True)
 
             elif query and not use_ai:
                 st.warning("Please enable 'Use AI Analysis' to get responses.")
