@@ -12,37 +12,90 @@ from datetime import datetime
 import numpy as np
 import json
 
+
 # -------------------------------------------------------
-# DARK THEME (Inline CSS)
+# PREMIUM DARK THEME UI (Glass + Smooth UI)
 # -------------------------------------------------------
-dark_css = """
+premium_css = """
 <style>
-body {
-    background-color: #000000 !important;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+html, body, div, input, textarea, label, span, p {
+    font-family: 'Inter', sans-serif !important;
 }
+
+/* Main app background */
 [data-testid="stAppViewContainer"] {
     background-color: #000000;
     color: white;
+    padding: 2rem;
 }
+
+/* Sidebar styling */
 [data-testid="stSidebar"] {
-    background-color: #111111;
+    background: rgba(17, 17, 17, 0.9);
+    backdrop-filter: blur(10px);
     color: white;
 }
-h1, h2, h3, h4, h5, h6, p, label, span, div, input, textarea {
-    color: white !important;
+
+/* Headings */
+h1, h2, h3 {
+    text-align: center;
+    font-weight: 700;
+    color: #ffffff !important;
 }
-.stCheckbox > label {
-    color: white !important;
+
+/* Pretty cards */
+.block-container {
+    padding-top: 1rem;
 }
-.stSelectbox label {
-    color: white !important;
+
+.card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1.4rem;
 }
+
+/* Selectbox styling */
+div[data-baseweb="select"] > div {
+    background-color: rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+}
+
+/* Inputs */
+input, textarea {
+    background-color: rgba(255,255,255,0.08) !important;
+    color: white !important;
+    border-radius: 8px;
+}
+
+/* Buttons */
+button[kind="secondary"] {
+    border-radius: 10px !important;
+}
+
+/* Divider line */
+.hr-line {
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    margin: 1.5rem 0;
+}
+
+/* Hover glow */
+.stButton>button:hover {
+    transform: scale(1.01);
+    background-color: #222 !important;
+}
+
 </style>
 """
-st.markdown(dark_css, unsafe_allow_html=True)
+
+st.markdown(premium_css, unsafe_allow_html=True)
 
 st.set_page_config(page_title="📊 E-Commerce Assistant", layout="wide")
-st.title("📊 AskData - Data answers made easy")
+st.title("✨ AskData — Your Smart E-Commerce Insights Assistant")
 
 
 # -------------------------------------------------------
@@ -57,8 +110,7 @@ def initialize_llm():
             azure_endpoint=st.secrets["AZURE_ENDPOINT"],
             api_key=st.secrets["AZURE_API_KEY"]
         )
-    except Exception as e:
-        st.error(f"LLM init error: {e}")
+    except:
         return None
 
 llm = initialize_llm()
@@ -67,36 +119,17 @@ llm = initialize_llm()
 # -------------------------------------------------------
 # PDF Generator
 # -------------------------------------------------------
-def generate_pdf(content, title="E-Commerce Insight"):
+def generate_pdf(content):
     try:
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, title, ln=True, align='C')
-
-        pdf.ln(10)
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(0, 10, f"Generated on: {datetime.now()}", ln=True)
-
-        pdf.ln(5)
-        pdf.set_font("Arial", size=10)
-
-        if isinstance(content, dict):
-            content = json.dumps(content, indent=2)
-
-        for line in str(content).split('\n'):
-            try:
-                clean = line.encode('latin-1', 'ignore').decode('latin-1')
-                pdf.cell(0, 6, clean, ln=True)
-            except:
-                pdf.cell(0, 6, "Encoding issue", ln=True)
-
+        pdf.multi_cell(0, 10, content)
         buf = io.BytesIO()
         buf.write(pdf.output(dest='S').encode('latin-1'))
         buf.seek(0)
         return buf
-    except Exception as e:
-        st.error(f"PDF error: {e}")
+    except:
         return None
 
 
@@ -104,174 +137,138 @@ def generate_pdf(content, title="E-Commerce Insight"):
 # Preprocess DataFrame
 # -------------------------------------------------------
 def preprocess_dataframe(df):
-    try:
-        df_processed = df.copy()
-
-        df_processed.columns = df_processed.columns.str.strip().str.upper()
-
-        rename_map = {
-            'DATE': 'ORDER_DATE',
-            'CUSTOMER_GENDER': 'GENDER',
-            'SEX': 'GENDER',
-            'CUSTOMER': 'CUSTOMER_NAME',
-            'CUST_NAME': 'CUSTOMER_NAME',
-            'USER_ID': 'CUSTOMER_ID',
-            'USERID': 'CUSTOMER_ID',
-            'PRODUCT_CATEGIC': 'PRODUCT_CATEGORY',
-            'PRODUCT_CAT': 'PRODUCT_CATEGORY',
-            'REGION': 'ZONE',
-            'AREA': 'ZONE',
-            'ORDERID': 'ORDER_ID'
-        }
-
-        cols_to_rename = {}
-        for old, new in rename_map.items():
-            if old in df_processed.columns and new not in df_processed.columns:
-                cols_to_rename[old] = new
-
-        if cols_to_rename:
-            df_processed.rename(columns=cols_to_rename, inplace=True)
-
-        if "PRODUCT_CATEGORY" in df_processed.columns and "PRODUCT" in df_processed.columns:
-            df_processed.drop(columns=["PRODUCT"], inplace=True)
-
-        if "ORDER_DATE" in df_processed.columns:
-            df_processed["ORDER_DATE"] = pd.to_datetime(
-                df_processed["ORDER_DATE"], errors="coerce", dayfirst=True
-            )
-            df_processed.dropna(subset=["ORDER_DATE"], inplace=True)
-
-        numeric_cols = [
-            'AMOUNT', 'ORDERS', 'QUANTITY', 'UNIT_COST', 'UNIT_PRICE',
-            'PROFIT', 'COST', 'REVENUE', 'CUSTOMER_AGE'
-        ]
-        for col in numeric_cols:
-            if col in df_processed.columns:
-                df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
-
-        if "GENDER" in df_processed.columns:
-            df_processed["GENDER"] = df_processed["GENDER"].astype(str).str.upper().replace({
-                "MALE": "M", "FEMALE": "F"
-            })
-
-        for col in df_processed.columns:
-            if df_processed[col].dtype == object:
-                df_processed[col] = df_processed[col].fillna("Unknown")
-
-        return df_processed
-
-    except Exception as e:
-        st.error(f"Preprocess error: {e}")
-        return pd.DataFrame()
+    df = df.copy()
+    df.columns = df.columns.str.strip().str.upper()
+    return df
 
 
 # -------------------------------------------------------
-# Execute LLM Complex Query
+# Execute LLM Query
 # -------------------------------------------------------
 def execute_complex_query(df, query, llm):
-    system_prompt = f"""
-    You are a senior data analyst.
-    Generate Python code ONLY (no markdown).
-    DataFrame = df
-    Columns = {df.columns.tolist()}
-    Final result MUST be stored in variable: result
+    prompt = f"""
+    You are a Python data expert.
+    Only output Python code, no text.
+    Use dataframe df.
+    Final output MUST be in variable `result`.
+    Query: {query}
     """
 
-    try:
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"Query: {query}")
-        ]
+    response = llm.invoke([
+        SystemMessage(content=prompt),
+        HumanMessage(content="Generate code.")
+    ])
 
-        response = llm.invoke(messages)
-        code = response.content.strip()
+    code = re.sub(r"```(python)?", "", response.content).replace("```", "").strip()
 
-        code = re.sub(r"```(python)?", "", code).replace("```", "").strip()
+    local_vars = {"df": df, "pd": pd, "np": np}
+    exec(code, local_vars)
 
-        local_vars = {"df": df, "pd": pd, "np": np}
-        exec(code, local_vars)
-
-        return local_vars.get("result"), code
-
-    except Exception as e:
-        return f"Execution error: {e}", ""
+    return local_vars.get("result"), code
 
 
-# -------------------------------------------------------
-# Format result for display
-# -------------------------------------------------------
-def format_result_output(result):
+# Format Output
+def format_output(result):
     if isinstance(result, pd.DataFrame):
         return result
     if isinstance(result, pd.Series):
         return result.to_frame("Value")
-    if isinstance(result, dict):
-        return pd.DataFrame([result])
     return str(result)
 
 
 # -------------------------------------------------------
-# Main App
+# Main UI
 # -------------------------------------------------------
 def main():
 
+    # ---------- SIDEBAR ----------
     with st.sidebar:
-        st.header("Example Queries")
+        st.header("💡 Example Queries")
 
         example_queries = [
-            "Product with highest frequency in each region",
-            "Top 5 customers by total spending",
-            "Monthly sales trend by category",
-            "Average order value by gender",
-            "Most popular product category by zone"
+            "Top 5 customers by spending",
+            "Best selling product category each month",
+            "Average order amount by gender",
+            "Total revenue by zone",
+            "Monthly sales trend"
         ]
 
-        selected_example = st.selectbox("Choose an example query:", example_queries)
+        selected_example = st.selectbox("Choose a query:", example_queries)
 
-    uploaded = st.file_uploader("📁 Upload CSV", type=["csv"])
+        st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
+
+        st.info("Upload a CSV to begin analysis.")
+
+
+    # ---------- FILE UPLOAD ----------
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    uploaded = st.file_uploader("📁 Upload your CSV file", type=["csv"])
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if uploaded:
         df_raw = pd.read_csv(uploaded)
         df = preprocess_dataframe(df_raw)
 
-        st.subheader("Data Preview")
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("📄 Data Preview")
         st.dataframe(df.head())
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        query = st.text_input("Enter your question", value=selected_example)
+        # ---------- QUERY INPUT ----------
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        query = st.text_input("🔍 Enter your question", value=selected_example)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        mode = st.selectbox("Response Type", ["Smart Analysis", "Chart", "Simple Query"])
-        use_ai = st.checkbox("Use AI Analysis", value=True)
-        show_code = st.checkbox("Show Generated Code", value=False)
+        # ---------- MODE OPTIONS ----------
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
 
+        mode = col1.selectbox("Response Type", ["Smart Analysis", "Chart", "Simple Query"])
+        use_ai = col2.checkbox("Use AI", value=True)
+        show_code = col3.checkbox("Show Code", value=False)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # -------------------------------------------------------
+        # SMART ANALYSIS
+        # -------------------------------------------------------
         if query and use_ai and llm:
 
-            # ---------------- SMART ANALYSIS -------------------
             if mode == "Smart Analysis":
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📊 Analysis Result")
+
                 result, code = execute_complex_query(df, query, llm)
+                formatted = format_output(result)
+
+                st.dataframe(formatted)
 
                 if show_code:
                     st.code(code, language="python")
 
-                formatted = format_result_output(result)
-                st.subheader("Result")
-                st.dataframe(formatted)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            # ---------------- CHART MODE ------------------------
+
+            # ---------------------------------------------------
+            # CHART MODE
+            # ---------------------------------------------------
             elif mode == "Chart":
-                system_prompt = f"""
-                Use pandas + plotly.express.
-                DataFrame: df
-                Columns: {df.columns.tolist()}
-                Define plot as 'fig'
-                Return ONLY code.
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📈 Chart Output")
+
+                chart_prompt = f"""
+                Use pandas & plotly.express.
+                DataFrame is df.
+                Create a chart named fig.
+                Query: {query}
+                Only return Python code.
                 """
 
-                messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=f"Generate chart code for: {query}")
-                ]
+                response = llm.invoke([
+                    SystemMessage(content=chart_prompt),
+                    HumanMessage(content="Generate chart code.")
+                ])
 
-                response = llm.invoke(messages)
                 chart_code = re.sub(r"```(python)?", "", response.content).replace("```", "").strip()
 
                 if show_code:
@@ -283,16 +280,23 @@ def main():
                 if "fig" in local_vars:
                     st.plotly_chart(local_vars["fig"], use_container_width=True)
                 else:
-                    st.error("No figure named fig found.")
+                    st.error("No figure named 'fig' found.")
 
-            # ---------------- SIMPLE QUERY ----------------------
+                st.markdown("</div>", unsafe_allow_html=True)
+
+
+            # ---------------------------------------------------
+            # SIMPLE QUERY
+            # ---------------------------------------------------
             elif mode == "Simple Query":
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📄 Simple Answer")
+
                 agent = create_pandas_dataframe_agent(llm, df, verbose=False, allow_dangerous_code=True)
                 result = agent.invoke(query)
                 st.markdown(result["output"])
 
-        elif query and not use_ai:
-            st.warning("Enable AI to use analysis.")
+                st.markdown("</div>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
