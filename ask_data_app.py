@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 from fpdf import FPDF
 from langchain_openai import AzureChatOpenAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
-from langchain.agents import AgentType
 from langchain.schema import SystemMessage, HumanMessage
 import re
 import io
@@ -374,12 +373,12 @@ def main():
                             try:
                                 if not df.empty:
                                     agent = create_pandas_dataframe_agent(
-                                        llm=llm,
-                                        df=df,
-                                        verbose=True,
-                                        allow_dangerous_code=True,
-                                        agent_type=AgentType.OPENAI_FUNCTIONS
-                                    )
+                                                llm,
+                                                df,
+                                                verbose=True,
+                                                allow_dangerous_code=True
+                                            )
+
                                     result = agent.invoke(query)
                                     st.markdown(result['output'])
                                 else:
@@ -453,4 +452,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
