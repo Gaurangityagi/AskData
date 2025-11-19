@@ -260,9 +260,9 @@ def main():
         st.header("Configuration")
 
         if llm:
-            st.success("LLM Connected")
+            st.success("Connected")
         else:
-            st.error("LLM Not Available")
+            st.error(" Not Available")
 
         st.subheader("Data Cleaning Options")
         preprocessing_choice = st.selectbox(
@@ -358,7 +358,7 @@ def main():
                         st.write(formatted)
 
                     # PDF export
-                    if st.button("📄 Export to PDF"):
+                    if st.button(" Export to PDF"):
                         pdf_buffer = generate_pdf(str(formatted))
                         if pdf_buffer:
                             st.download_button(
@@ -418,3 +418,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
