@@ -8,302 +8,295 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain_core.messages import SystemMessage, HumanMessage
 import re
 import io
-import base64
 from datetime import datetime
 import numpy as np
 import json
-import ast
 
-st.set_page_config(page_title="Ask Data", layout="wide")
-st.title(" AskData - Data answers made easy")
 
-# ---------------------------
+# -------------------------------------------------------
+# PREMIUM DARK THEME UI (Glass + Smooth UI)
+# -------------------------------------------------------
+premium_css = """
+<style>
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+html, body, div, input, textarea, label, span, p {
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Main app background */
+[data-testid="stAppViewContainer"] {
+    background-color: #000000;
+    color: white;
+    padding: 2rem;
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+    background: rgba(17, 17, 17, 0.9);
+    backdrop-filter: blur(10px);
+    color: white;
+}
+
+/* Headings */
+h1, h2, h3 {
+    text-align: center;
+    font-weight: 700;
+    color: #ffffff !important;
+}
+
+/* Pretty cards */
+.block-container {
+    padding-top: 1rem;
+}
+
+.card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1.4rem;
+}
+
+/* Selectbox styling */
+div[data-baseweb="select"] > div {
+    background-color: rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+}
+
+/* Inputs */
+input, textarea {
+    background-color: rgba(255,255,255,0.08) !important;
+    color: white !important;
+    border-radius: 8px;
+}
+
+/* Buttons */
+button[kind="secondary"] {
+    border-radius: 10px !important;
+}
+
+/* Divider line */
+.hr-line {
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    margin: 1.5rem 0;
+}
+
+/* Hover glow */
+.stButton>button:hover {
+    transform: scale(1.01);
+    background-color: #222 !important;
+}
+
+</style>
+"""
+
+st.markdown(premium_css, unsafe_allow_html=True)
+
+st.set_page_config(page_title="📊 E-Commerce Assistant", layout="wide")
+st.title("✨ AskData — Your Smart E-Commerce Insights Assistant")
+
+
+# -------------------------------------------------------
 # Initialize LLM
-# ---------------------------
+# -------------------------------------------------------
 @st.cache_resource
 def initialize_llm():
     try:
-        llm = AzureChatOpenAI(
+        return AzureChatOpenAI(
             openai_api_version=st.secrets["OPENAI_API_VERSION"],
             azure_deployment=st.secrets["AZURE_DEPLOYMENT"],
             azure_endpoint=st.secrets["AZURE_ENDPOINT"],
             api_key=st.secrets["AZURE_API_KEY"]
         )
-        return llm
-    except Exception as e:
-        st.error(f"Failed to initialize LLM: {e}")
+    except:
         return None
 
 llm = initialize_llm()
 
 
-# ---------------------------
+# -------------------------------------------------------
 # PDF Generator
-# ---------------------------
-def generate_pdf(content, title="E-Commerce Insight"):
+# -------------------------------------------------------
+def generate_pdf(content):
     try:
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, title, ln=True, align='C')
-
-        pdf.ln(10)
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(0, 10, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
-
-        pdf.ln(5)
-        pdf.set_font("Arial", size=10)
-
-        if isinstance(content, dict):
-            content = json.dumps(content, indent=2)
-
-        for line in str(content).split('\n'):
-            clean_line = line.encode('latin-1', 'ignore').decode('latin-1')
-            pdf.cell(0, 6, clean_line, ln=True)
-
-        pdf_buffer = io.BytesIO()
-        pdf_output = pdf.output(dest='S').encode('latin-1')
-        pdf_buffer.write(pdf_output)
-        pdf_buffer.seek(0)
-        return pdf_buffer
-
-    except Exception as e:
-        st.error(f"PDF generation error: {e}")
+        pdf.multi_cell(0, 10, content)
+        buf = io.BytesIO()
+        buf.write(pdf.output(dest='S').encode('latin-1'))
+        buf.seek(0)
+        return buf
+    except:
         return None
 
 
-# ------------------------------------------------------
-# EXTRA PREPROCESSING OPTIONS (NEWLY ADDED)
-# ------------------------------------------------------
-def apply_user_preprocessing(df, preprocessing_choice, missing_threshold):
+# -------------------------------------------------------
+# Preprocess DataFrame
+# -------------------------------------------------------
+def preprocess_dataframe(df):
     df = df.copy()
-
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    cat_cols = df.select_dtypes(include=['object']).columns
-
-    if preprocessing_choice == "Fill numeric with Mean":
-        for col in numeric_cols:
-            df[col].fillna(df[col].mean(), inplace=True)
-
-    elif preprocessing_choice == "Fill numeric with Median":
-        for col in numeric_cols:
-            df[col].fillna(df[col].median(), inplace=True)
-
-    elif preprocessing_choice == "Fill categorical with Mode":
-        for col in cat_cols:
-            if df[col].mode().empty:
-                df[col].fillna("Unknown", inplace=True)
-            else:
-                df[col].fillna(df[col].mode()[0], inplace=True)
-
-    elif preprocessing_choice == "Fill all with NULL/Unknown":
-        df.fillna("Unknown", inplace=True)
-
-    elif preprocessing_choice == "Drop rows with missing values":
-        df.dropna(inplace=True)
-
-    elif preprocessing_choice == "Drop columns with missing % > threshold":
-        threshold = missing_threshold / 100
-        missing_percent = df.isna().mean()
-        cols_to_drop = missing_percent[missing_percent > threshold].index
-        df.drop(columns=cols_to_drop, inplace=True)
-
+    df.columns = df.columns.str.strip().str.upper()
     return df
 
 
-# ---------------------------
-# Main Preprocess Function
-# ---------------------------
-def preprocess_dataframe(df):
-    try:
-        df_processed = df.copy()
-
-        # Standardize Columns
-        df_processed.columns = df_processed.columns.str.strip().str.upper()
-
-        flexible_rename_map = {
-            'DATE': 'ORDER_DATE',
-            'CUSTOMER_GENDER': 'GENDER',
-            'SEX': 'GENDER',
-            'CUST_NAME': 'CUSTOMER_NAME',
-            'CUSTOMER': 'CUSTOMER_NAME',
-            'USER_ID': 'CUSTOMER_ID',
-            'USERID': 'CUSTOMER_ID',
-            'PRODUCT_CATEGIC': 'PRODUCT_CATEGORY',
-            'PRODUCT_CAT': 'PRODUCT_CATEGORY',
-            'REGION': 'ZONE',
-            'AREA': 'ZONE',
-            'ORDERID': 'ORDER_ID'
-        }
-
-        rename_dict = {k: v for k, v in flexible_rename_map.items() if k in df_processed.columns}
-        df_processed.rename(columns=rename_dict, inplace=True)
-
-        # Handle PRODUCT column
-        if 'PRODUCT_CATEGORY' in df_processed.columns and 'PRODUCT' in df_processed.columns:
-            df_processed.drop(columns=['PRODUCT'], inplace=True)
-        elif 'PRODUCT' in df_processed.columns:
-            df_processed.rename(columns={'PRODUCT': 'PRODUCT_CATEGORY'}, inplace=True)
-
-        # Convert Dates
-        if 'ORDER_DATE' in df_processed.columns:
-            df_processed['ORDER_DATE'] = pd.to_datetime(df_processed['ORDER_DATE'], errors='coerce', dayfirst=True)
-            df_processed.dropna(subset=['ORDER_DATE'], inplace=True)
-
-        # Convert numerics
-        for col in ['AMOUNT', 'ORDERS', 'QUANTITY', 'UNIT_COST', 'UNIT_PRICE', 'PROFIT', 'COST', 'REVENUE', 'CUSTOMER_AGE']:
-            if col in df_processed.columns:
-                df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
-
-        return df_processed
-
-    except Exception as e:
-        st.error(f"Error during preprocessing: {e}")
-        return pd.DataFrame()
-
-
-# ---------------------------
-# Execute Complex Query
-# ---------------------------
+# -------------------------------------------------------
+# Execute LLM Query
+# -------------------------------------------------------
 def execute_complex_query(df, query, llm):
-    system_prompt = f"""
-    You are an expert data analyst.
-    Generate Python code to answer complex analytical queries.
-    DataFrame name: df
-    Columns: {df.columns.tolist()}
-    RULES:
-    - Use exact column names
-    - Final output must be variable named 'result'
-    - Use pandas only
-    - Return ONLY Python code
+    prompt = f"""
+    You are a Python data expert.
+    Only output Python code, no text.
+    Use dataframe df.
+    Final output MUST be in variable `result`.
+    Query: {query}
     """
 
-    try:
-        response = llm.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=query)
-        ])
+    response = llm.invoke([
+        SystemMessage(content=prompt),
+        HumanMessage(content="Generate code.")
+    ])
 
-        code = re.sub(r"```.*?```", "", response.content, flags=re.DOTALL).strip()
-        local_vars = {'df': df, 'pd': pd, 'np': np}
-        exec(code, local_vars)
+    code = re.sub(r"```(python)?", "", response.content).replace("```", "").strip()
 
-        return local_vars.get("result", "No result variable found"), code
+    local_vars = {"df": df, "pd": pd, "np": np}
+    exec(code, local_vars)
 
-    except Exception as e:
-        return f"Error running query: {e}", ""
+    return local_vars.get("result"), code
 
 
-# ---------------------------
-# Output Formatter
-# ---------------------------
-def format_result_output(result):
+# Format Output
+def format_output(result):
     if isinstance(result, pd.DataFrame):
         return result
     if isinstance(result, pd.Series):
-        return result.to_frame()
-    if isinstance(result, dict):
-        return pd.DataFrame([result])
+        return result.to_frame("Value")
     return str(result)
 
 
-# ---------------------------
-# MAIN APP
-# ---------------------------
+# -------------------------------------------------------
+# Main UI
+# -------------------------------------------------------
 def main():
 
-    # Sidebar
+    # ---------- SIDEBAR ----------
     with st.sidebar:
+        st.header("💡 Example Queries")
 
-        st.header("Configuration")
+        example_queries = [
+            "Top 5 customers by spending",
+            "Best selling product category each month",
+            "Average order amount by gender",
+            "Total revenue by zone",
+            "Monthly sales trend"
+        ]
 
-        # AI Status
-        if llm:
-            st.success("Connected")
-        else:
-            st.error("LLM Not Available")
+        selected_example = st.selectbox("Choose a query:", example_queries)
 
-        # NEW — DATA PREPROCESSING OPTIONS
-        st.subheader("Data Cleaning Options")
+        st.markdown("<div class='hr-line'></div>", unsafe_allow_html=True)
 
-        preprocessing_choice = st.selectbox(
-            "Choose missing value handling:",
-            [
-                "None",
-                "Fill numeric with Mean",
-                "Fill numeric with Median",
-                "Fill categorical with Mode",
-                "Fill all with NULL/Unknown",
-                "Drop rows with missing values",
-                "Drop columns with missing % > threshold",
-            ]
-        )
-
-        missing_threshold = None
-        if preprocessing_choice == "Drop columns with missing % > threshold":
-            missing_threshold = st.slider("Missing % Threshold", 1, 100, 40)
-
-        st.subheader("Example Queries")
-        st.write("• Product with highest frequency in each region")
-        st.write("• Average order value by gender")
-        st.write("• Plot total revenue by category")
+        st.info("Upload a CSV to begin analysis.")
 
 
-    # Upload File
-    uploaded_file = st.file_uploader("Upload your sales data (CSV)", type=["csv"])
+    # ---------- FILE UPLOAD ----------
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    uploaded = st.file_uploader("📁 Upload your CSV file", type=["csv"])
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    if uploaded_file:
-
-        # Safe load with multiple encodings
-        for enc in ["utf-8", "latin-1", "cp1252"]:
-            try:
-                uploaded_file.seek(0)
-                df_raw = pd.read_csv(uploaded_file, encoding=enc)
-                break
-            except:
-                continue
-
-        st.write("### Raw Data Preview")
-        st.dataframe(df_raw.head())
-
-        # Apply user-selected preprocessing BEFORE main processing
-        if preprocessing_choice != "None":
-            df_raw = apply_user_preprocessing(df_raw, preprocessing_choice, missing_threshold)
-
-        # Main Preprocessing
+    if uploaded:
+        df_raw = pd.read_csv(uploaded)
         df = preprocess_dataframe(df_raw)
 
-        st.write("### Cleaned Data")
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("📄 Data Preview")
         st.dataframe(df.head())
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        # Ask Query
-        st.subheader("Ask Your Question")
-        query = st.text_input("Enter your query")
+        # ---------- QUERY INPUT ----------
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        query = st.text_input("🔍 Enter your question", value=selected_example)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        mode = col1.selectbox("Mode", ["Smart Analysis", "Chart", "Simple Query"])
-        show_code = col2.checkbox("Show Code")
+        # ---------- MODE OPTIONS ----------
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
 
-        if query and llm:
+        mode = col1.selectbox("Response Type", ["Smart Analysis", "Chart", "Simple Query"])
+        use_ai = col2.checkbox("Use AI", value=True)
+        show_code = col3.checkbox("Show Code", value=False)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # -------------------------------------------------------
+        # SMART ANALYSIS
+        # -------------------------------------------------------
+        if query and use_ai and llm:
 
             if mode == "Smart Analysis":
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📊 Analysis Result")
+
                 result, code = execute_complex_query(df, query, llm)
+                formatted = format_output(result)
+
+                st.dataframe(formatted)
 
                 if show_code:
                     st.code(code, language="python")
 
-                formatted = format_result_output(result)
-                st.dataframe(formatted)
+                st.markdown("</div>", unsafe_allow_html=True)
 
+
+            # ---------------------------------------------------
+            # CHART MODE
+            # ---------------------------------------------------
             elif mode == "Chart":
-                st.write("Chart mode coming with LLM-based plot generation")
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📈 Chart Output")
 
+                chart_prompt = f"""
+                Use pandas & plotly.express.
+                DataFrame is df.
+                Create a chart named fig.
+                Query: {query}
+                Only return Python code.
+                """
+
+                response = llm.invoke([
+                    SystemMessage(content=chart_prompt),
+                    HumanMessage(content="Generate chart code.")
+                ])
+
+                chart_code = re.sub(r"```(python)?", "", response.content).replace("```", "").strip()
+
+                if show_code:
+                    st.code(chart_code, language="python")
+
+                local_vars = {}
+                exec(chart_code, {"df": df, "px": px, "pd": pd, "go": go}, local_vars)
+
+                if "fig" in local_vars:
+                    st.plotly_chart(local_vars["fig"], use_container_width=True)
+                else:
+                    st.error("No figure named 'fig' found.")
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+
+            # ---------------------------------------------------
+            # SIMPLE QUERY
+            # ---------------------------------------------------
             elif mode == "Simple Query":
-                agent = create_pandas_dataframe_agent(
-                    llm, df, verbose=False, allow_dangerous_code=True
-                )
-                response = agent.invoke(query)
-                st.markdown(response["output"])
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.subheader("📄 Simple Answer")
+
+                agent = create_pandas_dataframe_agent(llm, df, verbose=False, allow_dangerous_code=True)
+                result = agent.invoke(query)
+                st.markdown(result["output"])
+
+                st.markdown("</div>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
