@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-from langchain.chat_models import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain.agents import AgentType
 from langchain.schema import SystemMessage, HumanMessage
@@ -289,11 +289,11 @@ def main():
                 return
 
             # Show preview
-            st.subheader("📄 Data Preview")
+            st.subheader(" Data Preview")
             st.dataframe(df.head(10))
 
             # Show summary
-            with st.expander("📊 Data Summary"):
+            with st.expander(" Data Summary"):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write("**Dataset Info:**")
@@ -312,7 +312,7 @@ def main():
                     if not missing_with_values.empty:
                         st.dataframe(missing_with_values)
                     else:
-                        st.write("✅ No missing values detected.")
+                        st.write(" No missing values detected.")
 
             # User query
             st.subheader("💬 Ask Your Question")
@@ -338,23 +338,23 @@ def main():
                             result, code = execute_complex_query(df, query, llm)
                             
                             if show_code and code:
-                                st.subheader("📝 Generated Code")
+                                st.subheader(" Generated Code")
                                 st.code(code, language="python")
                             
-                            st.subheader("📊 Result")
+                            st.subheader(" Result")
                             formatted_result = format_result_output(result)
                             
                             if isinstance(formatted_result, pd.DataFrame) and not formatted_result.empty:
                                 st.dataframe(formatted_result)
                                 csv = formatted_result.to_csv(index=False)
                                 st.download_button(
-                                    label="📥 Download Results as CSV",
+                                    label=" Download Results as CSV",
                                     data=csv,
                                     file_name=f"analysis_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                                     mime="text/csv"
                                 )
                             elif isinstance(formatted_result, pd.DataFrame):
-                                st.write("✅ Analysis returned an empty DataFrame.")
+                                st.write(" Analysis returned an empty DataFrame.")
                             else: 
                                 st.write(formatted_result)
                             
@@ -453,3 +453,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
