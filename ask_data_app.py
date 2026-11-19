@@ -589,7 +589,7 @@ def main():
     st.markdown('<p class="section-title">Upload your dataset.</p>', unsafe_allow_html=True)
     st.markdown('<p class="section-desc">Drop a CSV file below to begin exploring your data.</p>', unsafe_allow_html=True)
 
-    uploaded = st.file_uploader("", type=["csv"], label_visibility="collapsed")
+    uploaded = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
 
     if uploaded is None:
         return
