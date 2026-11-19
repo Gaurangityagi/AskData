@@ -303,6 +303,16 @@ div[data-testid="stExpander"] {
     border-radius: 12px !important;
 }
 
+div[data-testid="stExpander"] summary {
+    padding: 0.75rem 1rem !important;
+    gap: 0.5rem !important;
+}
+
+div[data-testid="stExpander"] summary span {
+    overflow: visible !important;
+    text-overflow: unset !important;
+}
+
 /* Tabs */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0;
@@ -353,7 +363,7 @@ div[data-testid="stExpander"] {
 def initialize_llm():
     try:
         return ChatGroq(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             groq_api_key=st.secrets["GROQ_API_KEY"],
             temperature=0.1,
         )
