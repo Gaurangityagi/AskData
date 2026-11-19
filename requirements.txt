@@ -5,8 +5,7 @@ fpdf2
 numpy
 langchain
 langchain_experimental
-langchain-google-genai
+langchain-groq
 langchain-community
 langchain-core
 tabulate
-google-generativeai
