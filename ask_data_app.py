@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain_core.messages import SystemMessage, HumanMessage
 import re
@@ -289,9 +289,9 @@ div[data-testid="stExpander"] {
 @st.cache_resource
 def initialize_llm():
     try:
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=st.secrets["GOOGLE_API_KEY"],
+        llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            groq_api_key=st.secrets["GROQ_API_KEY"],
             temperature=0.1,
         )
         return llm
